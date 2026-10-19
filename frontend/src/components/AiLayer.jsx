@@ -94,7 +94,7 @@ export default function AiLayer() {
       const text = await file.text();
       const clipped = text.slice(0, 8000);
       const block = 'Attached text file: ' + file.name + '\n' + clipped + (text.length > 8000 ? '\n[Attachment truncated to 8,000 characters]' : '');
-      setPrompt((current) => (current.trim() ? current.trim() + '\n\n' : '') + block.slice(0, 12000));
+      setPrompt((current) => ((current.trim() ? current.trim() + '\n\n' : '') + block).slice(0, 12000));
       setError(text.length > 8000 ? 'File attached as text; content was truncated to fit the prompt limit.' : 'Attached ' + file.name + ' as text.');
     } catch { setError('Could not read this file as text.'); }
   }
@@ -108,7 +108,7 @@ export default function AiLayer() {
     recognition.interimResults = false;
     recognition.onresult = (event) => {
       const spoken = Array.from(event.results || []).map((result) => result[0]?.transcript || '').join(' ').trim();
-      if (spoken) setPrompt((current) => (current.trim() ? current.trim() + ' ' : '') + spoken).slice(0, 12000));
+      if (spoken) setPrompt((current) => ((current.trim() ? current.trim() + ' ' : '') + spoken).slice(0, 12000));
     };
     recognition.onerror = (event) => setError(event.error === 'not-allowed' ? 'Microphone permission is blocked. Allow it in browser site settings.' : 'Voice input failed: ' + (event.error || 'unknown error'));
     recognition.onend = () => setListening(false);
