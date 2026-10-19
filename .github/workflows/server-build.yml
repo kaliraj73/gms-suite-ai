@@ -1,0 +1,25 @@
+name: Server tests
+on:
+  push:
+    branches: [main, "feature/**"]
+    paths: ["server/**", ".github/workflows/server-build.yml"]
+  pull_request:
+    paths: ["server/**", ".github/workflows/server-build.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package.json
+      - run: npm install
+      - run: npm test
