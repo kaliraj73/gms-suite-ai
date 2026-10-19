@@ -129,12 +129,15 @@ export function createAiService({ env = process.env, fetchImpl = fetch } = {}) {
         if ([401, 403].includes(error?.status) && mode !== 'both') break;
       }
     }
-    const status = lastError?.status === 429 ? 429 : lastError?.status === 503 ? 503 : 502;
+    const status = [400, 401, 403, 429, 503].includes(lastError?.status) ? lastError.status : 502;
     const message = lastError?.name === 'TimeoutError' || lastError?.name === 'AbortError'
       ? 'The provider timed out. Try again or choose another model.'
-      : status === 429 ? 'Provider rate limit reached. Try another model or wait before retrying.'
-      : status === 503 ? lastError.message
-      : 'The selected provider could not complete the request. Try another model.';
+      : status === 400 ? (lastError?.message || 'The provider rejected this model or request. Check the model ID and request limits.')
+      : status === 401 ? 'Provider authentication failed (HTTP 401). Check the API key in server/.env, then restart the backend.'
+      : status === 403 ? 'Provider access was denied (HTTP 403). Check model access, API restrictions, billing, and account eligibility.'
+      : status === 429 ? 'Provider quota or rate limit reached (HTTP 429). Wait, check quota, or try another model.'
+      : status === 503 ? (lastError?.message || 'Provider is not configured.')
+      : lastError?.message || 'The provider could not complete the request. Check backend logs and provider status.';
     const error = new Error(message); error.status = status; throw error;
   }
 
