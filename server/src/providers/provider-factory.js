@@ -34,7 +34,7 @@ export function createAiService({ env = process.env, fetchImpl = fetch } = {}) {
     return { models, providers: { openrouter: openrouter.configured, gemini: gemini.configured }, warnings };
   }
 
-  async function generate({ model, prompt }) {
+  async function generate({ model, prompt, mode = 'openrouter' }) {
     const requested = model || (openrouter.configured ? 'openrouter:openrouter/free' : '');
     if (!requested) {
       const error = new Error('No provider configured. Add OPENROUTER_API_KEY or GEMINI_API_KEY to server/.env.');
@@ -96,6 +96,29 @@ export function createAiService({ env = process.env, fetchImpl = fetch } = {}) {
       error.status = 400; throw error;
     }
 
+    if (mode === 'openrouter' && provider !== 'openrouter') {
+      const error = new Error('Select an OpenRouter model in OpenRouter-only mode.');
+      error.status = 400; throw error;
+    }
+    if (mode === 'gemini' && provider !== 'gemini') {
+      const error = new Error('Select a Gemini model in Gemini-only mode.');
+      error.status = 400; throw error;
+    }
+    if (mode === 'both') {
+      if (provider === 'openrouter' && gemini.configured) {
+        const geminiModel = env.GEMINI_MODEL || 'gemini-2.5-flash';
+        attempts.push({ provider: 'gemini', model: geminiModel, run: () => gemini.chat({ model: geminiModel, prompt }) });
+      } else if (provider === 'gemini' && openrouter.configured) {
+        try {
+          const freeModels = await openRouterFreeModels();
+          attempts.push(...freeModels.slice(0, 3).map((m) => ({
+            provider: 'openrouter', model: m.id, run: () => openrouter.chat({ model: m.id, prompt }),
+          })));
+        } catch { /* try the OpenRouter free router as a last resort */ }
+        attempts.push({ provider: 'openrouter', model: 'openrouter/free', run: () => openrouter.chat({ model: 'openrouter/free', prompt }) });
+      }
+    }
+
     let lastError;
     for (let i = 0; i < attempts.length; i += 1) {
       try {
@@ -103,7 +126,7 @@ export function createAiService({ env = process.env, fetchImpl = fetch } = {}) {
         return { output, provider: attempts[i].provider, model: attempts[i].model, fallbackUsed: i > 0 };
       } catch (error) {
         lastError = error;
-        if ([401, 403].includes(error?.status)) break;
+        if ([401, 403].includes(error?.status) && mode !== 'both') break;
       }
     }
     const status = lastError?.status === 429 ? 429 : lastError?.status === 503 ? 503 : 502;
