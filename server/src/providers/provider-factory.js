@@ -52,7 +52,15 @@ export function createAiService({ env = process.env, fetchImpl = fetch } = {}) {
         error.status = 503; throw error;
       }
       if (modelId === 'openrouter/free') {
+        // Try the free router first, then individual models reported as zero-priced.
+        // The router can temporarily have no eligible provider even when free models exist.
         attempts.push({ provider: 'openrouter', model: modelId, run: () => openrouter.chat({ model: modelId, prompt }) });
+        try {
+          const freeModels = await openRouterFreeModels();
+          attempts.push(...freeModels.slice(0, 4).map((m) => ({
+            provider: 'openrouter', model: m.id, run: () => openrouter.chat({ model: m.id, prompt }),
+          })));
+        } catch { /* router attempt still runs; surface a safe error if all attempts fail */ }
       } else {
         let freeModels;
         try { freeModels = await openRouterFreeModels(); }
@@ -95,7 +103,7 @@ export function createAiService({ env = process.env, fetchImpl = fetch } = {}) {
         return { output, provider: attempts[i].provider, model: attempts[i].model, fallbackUsed: i > 0 };
       } catch (error) {
         lastError = error;
-        if ([400, 401, 403].includes(error?.status)) break;
+        if ([401, 403].includes(error?.status)) break;
       }
     }
     const status = lastError?.status === 429 ? 429 : lastError?.status === 503 ? 503 : 502;
