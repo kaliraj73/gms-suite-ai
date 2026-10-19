@@ -10,6 +10,10 @@ export function validatePrompt(req, res, next) {
   if (body.model !== undefined && (typeof body.model !== 'string' || body.model.length > 256)) {
     return res.status(400).json({ error: 'Model must be a string of at most 256 characters.' });
   }
-  req.aiInput = { prompt, model: body.model || '' };
+  const mode = body.mode || 'openrouter';
+  if (!['openrouter', 'gemini', 'both'].includes(mode)) {
+    return res.status(400).json({ error: 'Mode must be openrouter, gemini, or both.' });
+  }
+  req.aiInput = { prompt, model: body.model || '', mode };
   return next();
 }
