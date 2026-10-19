@@ -12,8 +12,8 @@ const PREFERRED_MODELS = [
   { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' },
   { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite' },
   { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite' },
-  { id: 'gemma-4-26b', name: 'Gemma 4 26B' },
-  { id: 'gemma-4-31b', name: 'Gemma 4 31B' },
+  { id: 'gemma-4-26b-a4b-it', name: 'Gemma 4 26B' },
+  { id: 'gemma-4-31b-it', name: 'Gemma 4 31B' },
 ];
 
 export function createGeminiProvider({ apiKey, env = process.env, fetchImpl = fetch, timeoutMs = 25000 }) {
