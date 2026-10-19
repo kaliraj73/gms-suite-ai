@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchHealth, fetchModels, sendPrompt } from '../api/aiClient.js';
 import './AiLayer.css';
 
@@ -31,6 +31,12 @@ export default function AiLayer() {
   const [health, setHealth] = useState(null);
   const [activeTool, setActiveTool] = useState('');
   const [listening, setListening] = useState(false);
+  const recognitionRef = useRef(null);
+
+  useEffect(() => () => {
+    try { recognitionRef.current?.stop(); } catch { /* recognition may already be stopped */ }
+    window.speechSynthesis?.cancel?.();
+  }, []);
 
   const refresh = useCallback(async () => {
     setLoadingModels(true); setError('');
@@ -79,7 +85,7 @@ export default function AiLayer() {
 
   function useTool(tool) {
     setActiveTool(tool.id);
-    setPrompt((current) => current.trim() ? current.trim() + '\n\n' + tool.prompt : tool.prompt);
+    setPrompt((current) => (current.trim() ? current.trim() + '\n\n' + tool.prompt : tool.prompt).slice(0, 12000));
   }
 
   async function attachTextFile(event) {
@@ -102,8 +108,13 @@ export default function AiLayer() {
   function toggleVoiceInput() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) { setError('Voice input is not supported by this browser. Try Edge or Chrome over HTTPS.'); return; }
-    if (listening) { setListening(false); return; }
+    if (listening) {
+      try { recognitionRef.current?.stop(); } catch { /* recognition may already be stopped */ }
+      setListening(false);
+      return;
+    }
     const recognition = new SpeechRecognition();
+    recognitionRef.current = recognition;
     recognition.lang = navigator.language || 'en-IN';
     recognition.interimResults = false;
     recognition.onresult = (event) => {
@@ -111,9 +122,9 @@ export default function AiLayer() {
       if (spoken) setPrompt((current) => ((current.trim() ? current.trim() + ' ' : '') + spoken).slice(0, 12000));
     };
     recognition.onerror = (event) => setError(event.error === 'not-allowed' ? 'Microphone permission is blocked. Allow it in browser site settings.' : 'Voice input failed: ' + (event.error || 'unknown error'));
-    recognition.onend = () => setListening(false);
+    recognition.onend = () => { recognitionRef.current = null; setListening(false); };
     setListening(true);
-    try { recognition.start(); } catch { setListening(false); setError('Could not start voice input. Please try again.'); }
+    try { recognition.start(); } catch { recognitionRef.current = null; setListening(false); setError('Could not start voice input. Please try again.'); }
   }
 
   function speakResponse(content) {
