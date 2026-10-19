@@ -17,7 +17,7 @@ The API listens on `0.0.0.0:8000` by default.
 - `GET /api/ai/models` — configured model list.
 - `POST /api/ai` — JSON body: `{ "model": "openrouter:openrouter/free", "prompt": "..." }`.
 
-OpenRouter models are filtered by provider-reported zero prompt and completion prices. Model prices, quotas, rate limits, and availability can change. Gemini is not considered free unless its ID is explicitly listed in `GEMINI_FREE_MODELS`; verify current pricing/quota for your Google account. Gemini-to-OpenRouter fallback is disabled unless `GEMINI_FALLBACK_ENABLED=true`.
+OpenRouter models are filtered by provider-reported zero prompt and completion prices. Model prices, quotas, rate limits, and availability can change. Gemini is not considered free unless its ID is explicitly listed in `GEMINI_FREE_MODELS`; verify current pricing/quota for your Google account. The default Gemini model is `gemini-3-flash`; override `GEMINI_MODEL` with a model verified for your account. Gemini-to-OpenRouter fallback is disabled unless `GEMINI_FALLBACK_ENABLED=true`.
 
 ## Tests
 
