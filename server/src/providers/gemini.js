@@ -42,5 +42,5 @@ export function createGeminiProvider({ apiKey, env = process.env, fetchImpl = fe
     return output;
   }
 
-  return { configured, fetchModels };
+  return { configured, fetchModels, chat };
 }
