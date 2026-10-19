@@ -1,0 +1,14 @@
+{
+  "name": "gms-suite-ai-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": { "start": "node src/index.js", "dev": "node --watch src/index.js", "test": "node --test" },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0"
+  }
+}
