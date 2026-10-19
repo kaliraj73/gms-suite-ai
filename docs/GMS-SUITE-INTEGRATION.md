@@ -1,31 +1,36 @@
 # Connect the GMS Suite dashboard to GMS AI Studio
 
-This integration keeps the current React/Express AI Studio and the uploaded Flask/FastAPI GMS Suite dashboard as separate services. The AI Studio shows a dashboard launch card; the dashboard's existing screenshot OCR, weather-summary, and FORMAT-II workflows remain in their own runtime. No database or user uploads are copied into Git.
+The AI Studio includes a dashboard launcher that opens the existing GMS Suite service in a separate tab. By default, it points to the current Cloud Shell dashboard URL supplied for this integration:
 
-## 1. Keep the repository clean
+`https://8001-cs-989819987085-default.cs-asia-southeast1-bool.cloudshell.dev/`
 
-Do not commit any of the following from the v4.1 ZIP or Cloud Shell runtime:
+Override this public URL at frontend build time by setting `VITE_GMS_SUITE_URL` if the dashboard is redeployed or its Cloud Shell URL changes. The dashboard URL is not a secret; never put API keys in a `VITE_*` variable.
 
-- `.env` or API keys
-- `gms.duckdb` / other database files
-- `uploads/`, private screenshots, generated exports, or user workbooks
-- local virtual environments, caches, or dependency folders
+## Architecture and safety
 
-Use the repository's `server/.env.example` as the key-name reference; put real provider keys only in the local `server/.env` or a deployment secret store.
+This integration keeps the React/Vite AI Studio and the existing GMS Suite dashboard as separate services. The AI Studio provides a launch card; dashboard screenshot OCR, weather summary, FORMAT-II, Excel/PDF processing, and reports continue to run in the dashboard service.
 
-## 2. Start the AI Studio services
+Do not commit API keys, `.env`, DuckDB/database files, private screenshots, uploads, generated exports, or private workbooks. The dashboard's runtime data remains outside this Git repository.
 
-From the repository root in Cloud Shell:
+## Ports
+
+- AI API: port 8000
+- GMS dashboard: port 8001
+- Vite frontend: usually port 5173 in development
+
+## Run in Android Cloud Shell
+
+Run the AI API from the repository root:
 
 ```bash
 cd server
 npm install
 cp .env.example .env
-# Add provider keys locally to server/.env; do not commit this file.
+# Add provider keys locally to server/.env; never commit this file.
 npm start
 ```
 
-In another terminal:
+Run the frontend in another terminal:
 
 ```bash
 cd frontend
@@ -33,11 +38,7 @@ npm install
 npm run dev -- --host 0.0.0.0
 ```
 
-The AI API uses port 8000 by default; the Vite frontend usually uses port 5173.
-
-## 3. Start the GMS Suite dashboard separately
-
-Upload the trusted `gms-suite.zip` archive to your Cloud Shell home directory. Then run:
+Run the dashboard from the trusted uploaded ZIP in a separate runtime directory:
 
 ```bash
 mkdir -p ~/gms-suite-runtime
@@ -46,36 +47,15 @@ cd ~/gms-suite-runtime/gms-suite
 PORT=8001 ./start.sh
 ```
 
-Install system dependencies if the tools you need require them:
+If the dashboard uses OCR/PDF/legacy MDB features, install only the system dependencies required by those features and verify the project's setup instructions.
 
-```bash
-sudo apt-get update
-sudo apt-get install -y tesseract-ocr mdbtools libreoffice poppler-utils
-```
+## Validation
 
-The dashboard is intentionally assigned port 8001 so it does not collide with the AI API on port 8000. Its runtime folder and generated data remain outside the Git repository.
+- Open the AI Studio frontend and click **Open GMS dashboard**.
+- Verify the dashboard's existing tools, uploads, OCR, exports, and persistence with non-sensitive sample data.
+- Confirm `GET /api/ai/health` exposes only provider configuration status, not credentials.
+- Run `npm run build` in `frontend` and `npm test` in `server`.
 
-## 4. Link the dashboard in AI Studio
+## Integration boundary
 
-Open Cloud Shell Web Preview for port 8001 and copy the exact URL it provides. In the repository's `frontend` directory, create a local `.env.local` file:
-
-```bash
-cd ~/gms-suite-ai/frontend
-printf 'VITE_GMS_SUITE_URL=%s\n' 'PASTE_THE_EXACT_PORT_8001_WEB_PREVIEW_URL_HERE' > .env.local
-```
-
-Replace the placeholder with the actual URL from Cloud Shell Web Preview. Then stop and restart the Vite frontend. The dashboard launch card will open that URL in a separate tab. `VITE_GMS_SUITE_URL` is a public URL, not a secret; never put API keys in a `VITE_*` variable.
-
-For a production deployment, set `VITE_GMS_SUITE_URL` to the deployed dashboard's HTTPS URL at frontend build time. Deploy the dashboard separately with its required Python/system packages, persistent storage policy, and access controls.
-
-## 5. Verify
-
-- Open the AI Studio frontend and confirm the dashboard card shows the configured URL.
-- Open the dashboard in a new tab and test each existing tool independently.
-- Confirm `GET /api/ai/health` still reports provider configuration without exposing secrets.
-- Run `cd frontend && npm run build` and `cd server && npm test`.
-- Test upload, OCR, export, and data persistence with non-sensitive sample data before using official records.
-
-## Current integration boundary
-
-The launch card connects the user experience, but it does not proxy dashboard APIs or grant the AI access to DuckDB/workbooks. The AI tools still work from prompts and text attachments. A future data-aware integration should add explicit read-only dashboard API endpoints, authentication, schema validation, and audit logging before allowing AI analysis of stored records. Do not expose DuckDB or upload directories directly to the browser.
+The launcher connects the user experience only. It does not proxy dashboard APIs or give the AI direct access to DuckDB/workbooks. AI tool buttons create guided prompts and do not execute database mutations. PDF/XLSX parsing and image OCR are not implemented by the AI frontend. A future data-aware integration should add authenticated, validated, read-only APIs and audit logging rather than exposing database files or upload directories to the browser.
