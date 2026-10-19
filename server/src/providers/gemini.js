@@ -8,7 +8,7 @@ function apiError(message, status = 502) {
 
 export function createGeminiProvider({ apiKey, env = process.env, fetchImpl = fetch, timeoutMs = 25000 }) {
   const configured = Boolean(apiKey);
-  const defaultModel = env.GEMINI_MODEL || 'gemini-2.5-flash';
+  const defaultModel = env.GEMINI_MODEL || 'gemini-3-flash';
   const explicitlyFree = new Set((env.GEMINI_FREE_MODELS || '').split(',').map((v) => v.trim()).filter(Boolean));
 
   async function fetchModels() {
