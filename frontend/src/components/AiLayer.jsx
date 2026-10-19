@@ -26,6 +26,7 @@ export default function AiLayer() {
       const [modelResult, healthResult] = await Promise.all([fetchModels(), fetchHealth()]);
       const next = Array.isArray(modelResult.models) ? modelResult.models : [];
       setModels(next); setHealth(healthResult);
+      setSelectedModel((current) => next.some((item) => item.id === current) ? current : (next.find((item) => item.provider === 'openrouter' && item.free)?.id || next.find((item) => item.provider === 'openrouter')?.id || next[0]?.id || ''));
       if (!next.length) setError('No models are available. Configure a provider key in server/.env and refresh.');
       if (modelResult.warnings?.length) setError(modelResult.warnings.join(' '));
     } catch (err) { setError(err.message || 'Could not load models.'); setHealth(null); }
