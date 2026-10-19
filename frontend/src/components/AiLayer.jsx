@@ -36,6 +36,17 @@ export default function AiLayer() {
   useEffect(() => { refresh(); }, [refresh]);
   useEffect(() => { try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(-30))); } catch { /* storage can be unavailable */ } }, [history]);
 
+  async function copyMessage(content) {
+    try { await navigator.clipboard.writeText(content); setError('Response copied to clipboard.'); }
+    catch { setError('Clipboard access is unavailable in this browser. Select and copy the response text manually.'); }
+  }
+
+  function clearChat() {
+    setHistory([]);
+    setError('');
+    try { localStorage.removeItem(HISTORY_KEY); } catch { /* storage can be unavailable */ }
+  }
+
   const availableModels = useMemo(() => {
     if (mode === 'openrouter') return models.filter((item) => item.provider === 'openrouter');
     if (mode === 'gemini') return models.filter((item) => item.provider === 'gemini');
@@ -87,9 +98,9 @@ export default function AiLayer() {
       {selected&&!selected.free&&<p className="provider-note">This model is not marked free in the configuration. Check current provider terms and your account quota.</p>}
       <label className="field-label" htmlFor="prompt-input">Your prompt</label>
       <textarea id="prompt-input" value={prompt} onChange={(e)=>setPrompt(e.target.value)} placeholder="Ask about groundwater monitoring, rainfall data, or software development…" rows={4} maxLength={12000} disabled={loading}/>
-      <div className="composer-footer"><span className="character-count">{prompt.length.toLocaleString()} / 12,000</span><div className="composer-actions"><button className="button button-secondary" type="button" onClick={()=>{setHistory([]);setError('');}} disabled={loading&&history.length===0}>Clear history</button><button className="button button-primary" type="submit" disabled={loading||loadingModels||!prompt.trim()||!selectedModel}>{loading?'Thinking…':'Send prompt'}</button></div></div>
+      <div className="composer-footer"><span className="character-count">{prompt.length.toLocaleString()} / 12,000</span><div className="composer-actions"><button className="button button-secondary" type="button" onClick={clearChat} disabled={history.length===0}>Clear chat</button><button className="button button-primary" type="submit" disabled={loading||loadingModels||!prompt.trim()||!selectedModel}>{loading?'Thinking…':'Send prompt'}</button></div></div>
     </form>
     {error&&<div className="error-message" role="alert">{error}</div>}
-    <div className="conversation" aria-live="polite">{history.length===0?<div className="empty-state"><div className="empty-state-icon" aria-hidden="true">✦</div><strong>Your conversation will appear here</strong><p>Choose a provider mode and send a prompt to begin.</p></div>:history.map((item)=><article className={`message message-${item.role}`} key={item.id}><div className="message-meta"><strong>{item.role==='user'?'You':'GMS AI'}</strong>{item.provider&&<span>{item.provider}{item.fallbackUsed?' · fallback used':''}</span>}</div><p>{item.content}</p></article>)}</div>
+    <div className="conversation" aria-live="polite">{history.length===0?<div className="empty-state"><div className="empty-state-icon" aria-hidden="true">✦</div><strong>Your conversation will appear here</strong><p>Choose a provider mode and send a prompt to begin.</p></div>:history.map((item)=><article className={`message message-${item.role}`} key={item.id}><div className="message-meta"><strong>{item.role==='user'?'You':'GMS AI'}</strong>{item.provider&&<span>{item.provider}{item.fallbackUsed?' · fallback used':''}</span>}</div><p>{item.content}</p>{item.role==='assistant'&&<button className="button button-secondary message-copy" type="button" onClick={()=>copyMessage(item.content)}>Copy response</button>}</article>)}</div>
   </section>;
 }
