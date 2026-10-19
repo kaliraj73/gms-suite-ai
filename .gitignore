@@ -1,12 +1,31 @@
+# Node / frontend outputs
+node_modules/
+frontend/node_modules/
+server/node_modules/
+frontend/dist/
+dist/
+.vite/
+coverage/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Local secrets/configuration
+.env
+.env.*
+!.env.example
+server/.env
+frontend/.env
+*.pem
+*.key
+
 # Gradle files
 .gradle/
 build/
 .kotlin/
-
-# Local configuration file (sdk path, etc)
 local.properties
 
-# Log/OS Files
+# Logs and OS files
 *.log
 
 # Android Studio generated files and folders
