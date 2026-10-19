@@ -106,7 +106,7 @@ export function createAiService({ env = process.env, fetchImpl = fetch } = {}) {
     }
     if (mode === 'both') {
       if (provider === 'openrouter' && gemini.configured) {
-        const geminiModel = env.GEMINI_MODEL || 'gemini-3-flash';
+        const geminiModel = env.GEMINI_MODEL || 'gemini-3.8-flash';
         attempts.push({ provider: 'gemini', model: geminiModel, run: () => gemini.chat({ model: geminiModel, prompt }) });
       } else if (provider === 'gemini' && openrouter.configured) {
         try {
