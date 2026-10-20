@@ -38,10 +38,10 @@ export default function AiLayer() {
     window.speechSynthesis?.cancel?.();
   }, []);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (forceRefresh = false) => {
     setLoadingModels(true); setError('');
     try {
-      const [modelResult, healthResult] = await Promise.all([fetchModels(), fetchHealth()]);
+      const [modelResult, healthResult] = await Promise.all([fetchModels({ refresh: forceRefresh }), fetchHealth()]);
       const next = Array.isArray(modelResult.models) ? modelResult.models : [];
       setModels(next); setHealth(healthResult);
       setSelectedModel((current) => next.some((item) => item.id === current) ? current : (next.find((item) => item.provider === 'openrouter' && item.free)?.id || next.find((item) => item.provider === 'openrouter')?.id || next[0]?.id || ''));
@@ -149,7 +149,7 @@ export default function AiLayer() {
   }
 
   return <section className="ai-panel" aria-labelledby="ai-title">
-    <div className="ai-panel-heading"><div><h2 id="ai-title">AI assistant</h2><p>Choose OpenRouter, Gemini, or automatic cross-provider fallback.</p></div><button className="button button-secondary" type="button" onClick={refresh} disabled={loadingModels||loading}>{loadingModels?'Loading…':'Refresh models'}</button></div>
+    <div className="ai-panel-heading"><div><h2 id="ai-title">AI assistant</h2><p>Choose OpenRouter, Gemini, or automatic cross-provider fallback.</p></div><button className="button button-secondary" type="button" onClick={() => refresh(true)} disabled={loadingModels||loading}>{loadingModels?'Loading…':'Refresh models'}</button></div>
     <div className="provider-status" role="status"><span className={health?.status==='ok'?'status-dot status-dot-ok':'status-dot'}/>{health?.status==='ok'? `API online · OpenRouter ${health.providers?.openrouter?'configured':'not configured'} · Gemini ${health.providers?.gemini?'configured':'not configured'}`:'Checking API connection…'}</div>
     <div className="ai-tools-menu" aria-label="GMS AI tools"><div className="ai-tools-heading"><strong>AI tools</strong><span>Choose a guided task</span></div><div className="ai-tools-grid">{AI_TOOLS.map((tool) => <button key={tool.id} type="button" className={activeTool === tool.id ? "ai-tool-button ai-tool-active" : "ai-tool-button"} aria-pressed={activeTool === tool.id} onClick={() => useTool(tool)} disabled={loading}>{tool.label}</button>)}</div><p className="ai-tool-note">Tools guide the AI using your prompt and supplied text; they do not directly change DuckDB or master files.</p></div>
     <form onSubmit={handleSubmit}>
