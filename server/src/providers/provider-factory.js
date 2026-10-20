@@ -26,7 +26,7 @@ export function createAiService({ env = process.env, fetchImpl = fetch } = {}) {
     let discoveredGemini = [];
     if (openrouter.configured) {
       try { freeModels = await openRouterFreeModels(); }
-      catch (error) { warnings.push(error?.status === 401 ? 'OpenRouter authentication failed (HTTP 401). Check the server-side key and restart the backend.' : 'OpenRouter model discovery is temporarily unavailable.'); }
+      catch (error) { warnings.push(error?.status === 401 ? 'OpenRouter authentication failed (HTTP 401). Check the server-side key and restart the backend.' : error?.status === 403 ? 'OpenRouter access denied (HTTP 403). Check account permissions and restrictions.' : error?.status === 429 ? 'OpenRouter rate limit or quota reached (HTTP 429).' : error?.status === 504 ? 'OpenRouter request timed out. Retry later.' : 'OpenRouter model discovery is temporarily unavailable.'); }
     }
     if (gemini.configured) {
       try { discoveredGemini = await geminiModels(); }
@@ -59,8 +59,8 @@ export function createAiService({ env = process.env, fetchImpl = fetch } = {}) {
     if (provider === 'openrouter' && !openrouter.configured) { const error = new Error('OpenRouter is not configured. Add OPENROUTER_API_KEY to server/.env.'); error.status = 503; throw error; }
 
     const attempts = [];
+    const fallbackAttempts = [];
     if (provider === 'gemini') {
-      // Validate against the live account catalogue; a stale/deprecated ID never enters retry/fallback.
       const liveModels = await geminiModels();
       if (!liveModels.some((item) => item.id === modelId)) {
         const error = new Error('This Gemini model is not in the current account catalogue. Refresh models and choose a listed model.'); error.status = 404; throw error;
@@ -85,30 +85,40 @@ export function createAiService({ env = process.env, fetchImpl = fetch } = {}) {
       if (provider === 'gemini' && openrouter.configured) {
         try {
           const freeModels = await openRouterFreeModels();
-          attempts.push(...freeModels.slice(0, 3).map((item) => ({ provider: 'openrouter', model: item.id, run: () => openrouter.chat({ model: item.id, prompt }) })));
+          fallbackAttempts.push(...freeModels.slice(0, 3).map((item) => ({ provider: 'openrouter', model: item.id, run: () => openrouter.chat({ model: item.id, prompt }) })));
         } catch { /* preserve primary provider */ }
-        attempts.push({ provider: 'openrouter', model: 'openrouter/free', run: () => openrouter.chat({ model: 'openrouter/free', prompt }) });
+        fallbackAttempts.push({ provider: 'openrouter', model: 'openrouter/free', run: () => openrouter.chat({ model: 'openrouter/free', prompt }) });
       } else if (provider === 'openrouter' && gemini.configured) {
         try {
           const liveModels = await geminiModels();
           const preferred = env.GEMINI_MODEL;
           const selected = liveModels.find((item) => item.id === preferred) || liveModels[0];
-          if (selected) attempts.push({ provider: 'gemini', model: selected.id, run: () => gemini.chat({ model: selected.id, prompt }) });
+          if (selected) fallbackAttempts.push({ provider: 'gemini', model: selected.id, run: () => gemini.chat({ model: selected.id, prompt }) });
         } catch { /* no Gemini fallback if discovery fails */ }
       }
     }
 
     let lastError;
-    for (let i = 0; i < attempts.length; i += 1) {
+    let completedProviderIndex = 0;
+    const orderedAttempts = mode === 'both' ? [...attempts.slice(0, 1), ...fallbackAttempts, ...attempts.slice(1)] : attempts;
+    for (let i = 0; i < orderedAttempts.length; i += 1) {
       try {
-        const output = await attempts[i].run();
-        return { output, provider: attempts[i].provider, model: attempts[i].model, fallbackUsed: i > 0 };
+        const output = await orderedAttempts[i].run();
+        return { output, provider: orderedAttempts[i].provider, model: orderedAttempts[i].model, fallbackUsed: i > 0 };
       } catch (error) {
         lastError = error;
-        // A bad model, auth denial, or malformed request is not fixed by trying more models.
-        if ([400, 401, 403, 404].includes(error?.status)) break;
+        completedProviderIndex = i;
+        const hasDifferentProviderAhead = orderedAttempts.slice(i + 1).some((attempt) => attempt.provider !== orderedAttempts[i].provider);
+        // Never try more models on a provider after permanent auth/request errors,
+        // but still honor explicit cross-provider fallback mode.
+        if ([400, 401, 403, 404].includes(error?.status) && !hasDifferentProviderAhead) break;
+        if ([400, 401, 403, 404].includes(error?.status)) {
+          const remaining = orderedAttempts.slice(i + 1).filter((attempt) => attempt.provider !== orderedAttempts[i].provider);
+          orderedAttempts.splice(i + 1, orderedAttempts.length - i - 1, ...remaining);
+        }
       }
     }
+    void completedProviderIndex;
     const status = [400, 401, 403, 404, 429, 503, 504].includes(lastError?.status) ? lastError.status : 502;
     const message = lastError?.message || 'The provider could not complete the request. Check provider status and try again.';
     const error = new Error(message); error.status = status; throw error;
