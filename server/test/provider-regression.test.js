@@ -64,7 +64,7 @@ test('OpenRouter successful chat uses canonical API endpoint and trimmed server 
   });
 });
 
-test('OpenRouter 401 stops fallback retries immediately', async () => {
+test('OpenRouter 401 stops same-provider fallback retries immediately', async () => {
   let calls = 0;
   const service = createAiService({
     env: { OPENROUTER_API_KEY: 'test-key', MODEL_CACHE_TTL_MS: '60000' },
@@ -76,15 +76,75 @@ test('OpenRouter 401 stops fallback retries immediately', async () => {
           { id: 'free-two', pricing: { prompt: '0', completion: '0' } },
         ] });
       }
-      return response({ error: { message: 'unauthorized' } }, 401);
+      return response({ error: { message: 'private unauthorized detail' } }, 401);
     },
   });
   await assert.rejects(service.generate({ model: 'openrouter:free-one', prompt: 'hi' }), (error) => {
     assert.equal(error.status, 401);
     assert.match(error.message, /authentication failed/);
+    assert.doesNotMatch(error.message, /private unauthorized detail|test-key/);
     return true;
   });
   assert.equal(calls, 2, 'one catalogue request and one chat request; no repeated model retries');
+});
+
+test('OpenRouter 401 primary failure tries configured Gemini in both mode only', async () => {
+  const calls = [];
+  const service = createAiService({
+    env: { OPENROUTER_API_KEY: 'test-key', GEMINI_API_KEY: 'another-test-key', MODEL_CACHE_TTL_MS: '60000' },
+    fetchImpl: async (url) => {
+      const value = String(url);
+      calls.push(value);
+      if (value.endsWith('/models')) return response({ data: [{ id: 'free-one', pricing: { prompt: '0', completion: '0' } }] });
+      if (value.endsWith('/models?pageSize=1000')) return response({ models: [{ name: 'models/gemini-live-001', supportedGenerationMethods: ['generateContent'] }] });
+      if (value.endsWith('/chat/completions')) return response({ error: { message: 'invalid credential' } }, 401);
+      if (value.endsWith('/models/gemini-live-001:generateContent')) return response({ candidates: [{ content: { parts: [{ text: 'Gemini fallback answer' }] } }] });
+      return response({}, 404);
+    },
+  });
+  const result = await service.generate({ model: 'openrouter:free-one', mode: 'both', prompt: 'hi' });
+  assert.equal(result.output, 'Gemini fallback answer');
+  assert.equal(result.provider, 'gemini');
+  assert.equal(result.fallbackUsed, true);
+  assert.equal(calls.filter((url) => url.endsWith('/chat/completions')).length, 1, 'do not retry OpenRouter models after 401');
+});
+
+test('OpenRouter missing and whitespace-only API keys are not configured', async () => {
+  let calls = 0;
+  const fetchImpl = async () => { calls += 1; return response({}); };
+  assert.equal(createOpenRouterProvider({ apiKey: '', fetchImpl }).configured, false);
+  assert.equal(createOpenRouterProvider({ apiKey: '  \t ', fetchImpl }).configured, false);
+  assert.deepEqual(await createOpenRouterProvider({ apiKey: '  ', fetchImpl }).fetchModels(), []);
+  assert.equal(calls, 0);
+});
+
+test('OpenRouter model discovery uses the canonical URL and Bearer header', async () => {
+  let seen;
+  const provider = createOpenRouterProvider({
+    apiKey: ' test-key ',
+    fetchImpl: async (url, options) => { seen = { url: String(url), auth: options.headers.Authorization }; return response({ data: [] }); },
+  });
+  await provider.fetchModels();
+  assert.equal(seen.url, 'https://openrouter.ai/api/v1/models');
+  assert.equal(seen.auth, 'Bearer test-key');
+});
+
+test('OpenRouter maps common provider statuses without exposing payloads', async () => {
+  for (const [status, matcher] of [
+    [401, /authentication failed/], [403, /access denied/], [404, /not found/],
+    [429, /rate limit or quota/], [503, /service error/],
+  ]) {
+    const provider = createOpenRouterProvider({
+      apiKey: 'secret-test-value',
+      fetchImpl: async () => response({ error: { message: 'sensitive raw provider payload' } }, status),
+    });
+    await assert.rejects(provider.chat({ model: 'provider/model', prompt: 'hi' }), (error) => {
+      assert.match(error.message, matcher);
+      assert.doesNotMatch(error.message, /sensitive raw provider payload|secret-test-value/);
+      assert.ok(Number.isInteger(error.status));
+      return true;
+    });
+  }
 });
 
 test('Gemini rejects model absent from live catalogue without issuing a generation request', async () => {
