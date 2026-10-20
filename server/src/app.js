@@ -11,8 +11,8 @@ export function createApp({ aiService }) {
 
   app.get('/api/ai/health', (_req, res) => res.json(aiService.health()));
 
-  app.get('/api/ai/models', async (_req, res) => {
-    try { res.json(await aiService.listModels()); }
+  app.get('/api/ai/models', async (req, res) => {
+    try { res.json(await aiService.listModels({ refresh: req.query.refresh === '1' })); }
     catch { res.status(502).json({ error: 'Could not load models from configured providers.' }); }
   });
 
