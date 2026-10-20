@@ -6,16 +6,23 @@ function apiError(message, status = 502) {
   return error;
 }
 
-async function decode(response, provider) {
-  await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const status = response.status === 429 ? 429
-      : response.status === 401 || response.status === 403 ? response.status
-      : response.status >= 500 ? 502 : response.status === 404 ? 404 : 400;
-    throw apiError(`${provider} request failed (HTTP ${response.status}).`, status);
+function providerError(provider, status) {
+  if (status === 401) {
+    return apiError(`${provider} authentication failed (HTTP 401). Verify that the server loaded an active, non-revoked API key from its backend environment, then restart the backend.`, 401);
   }
-  // Read the body only once; the provider response is parsed by the caller on success.
-  return response;
+  if (status === 403) {
+    return apiError(`${provider} access denied (HTTP 403). Check account eligibility, API restrictions, and quota access.`, 403);
+  }
+  if (status === 404) {
+    return apiError(`${provider} model or endpoint was not found (HTTP 404). Refresh the model list and choose an available model.`, 404);
+  }
+  if (status === 429) {
+    return apiError(`${provider} rate limit or quota reached (HTTP 429). Check account quota and retry later.`, 429);
+  }
+  if (status >= 500) {
+    return apiError(`${provider} service error (HTTP ${status}). Try again later.`, 502);
+  }
+  return apiError(`${provider} request failed (HTTP ${status}). Check the selected model and request.`, 400);
 }
 
 function safeFetchError(error, provider) {
@@ -39,12 +46,7 @@ export function createOpenRouterProvider({ apiKey, env = process.env, fetchImpl 
     try {
       const response = await fetchImpl(url, { ...options, signal: AbortSignal.timeout(timeoutMs) });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        const status = response.status === 429 ? 429
-          : response.status === 401 || response.status === 403 ? response.status
-          : response.status >= 500 ? 502 : response.status === 404 ? 404 : 400;
-        throw apiError(`${provider} request failed (HTTP ${response.status}).`, status);
-      }
+      if (!response.ok) throw providerError(provider, response.status);
       return data;
     } catch (error) {
       if (Number.isInteger(error?.status)) throw error;
