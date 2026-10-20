@@ -9,15 +9,17 @@ function apiError(message, status = 502) {
 async function decode(response, provider) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const status = response.status === 429 ? 429 : (response.status === 401 || response.status === 403 ? response.status : response.status >= 500 ? 502 : 400);
-    // Do not include provider response bodies in logs; they may contain diagnostics not suitable for clients.
+    const status = response.status === 429 ? 429
+      : response.status === 401 || response.status === 403 ? response.status
+      : response.status >= 500 ? 502 : 400;
+    // Never forward provider response bodies: they can contain sensitive diagnostics.
     throw apiError(`${provider} request failed (HTTP ${response.status}).`, status);
   }
   return data;
 }
 
 export function createOpenRouterProvider({ apiKey, env = process.env, fetchImpl = fetch, timeoutMs = 25000 }) {
-  const configured = Boolean(apiKey);
+  const configured = Boolean(apiKey?.trim());
   const headers = () => ({
     Authorization: `Bearer ${apiKey}`,
     'Content-Type': 'application/json',

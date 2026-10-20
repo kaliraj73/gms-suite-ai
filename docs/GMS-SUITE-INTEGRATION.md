@@ -1,61 +1,49 @@
 # Connect the GMS Suite dashboard to GMS AI Studio
 
-The AI Studio includes a dashboard launcher that opens the existing GMS Suite service in a separate tab. By default, it points to the current Cloud Shell dashboard URL supplied for this integration:
+The AI Studio opens the existing GMS dashboard in a separate tab. Set `VITE_GMS_SUITE_URL` at frontend build time if the Cloud Shell Web Preview URL changes. The dashboard URL is public configuration; never put API keys in a `VITE_*` variable.
 
-`https://8001-cs-989819987085-default.cs-asia-southeast1-bool.cloudshell.dev/`
+## Service architecture
 
-Override this public URL at frontend build time by setting `VITE_GMS_SUITE_URL` if the dashboard is redeployed or its Cloud Shell URL changes. The dashboard URL is not a secret; never put API keys in a `VITE_*` variable.
-
-## Architecture and safety
-
-This integration keeps the React/Vite AI Studio and the existing GMS Suite dashboard as separate services. The AI Studio provides a launch card; dashboard screenshot OCR, weather summary, FORMAT-II, Excel/PDF processing, and reports continue to run in the dashboard service.
-
-Do not commit API keys, `.env`, DuckDB/database files, private screenshots, uploads, generated exports, or private workbooks. The dashboard's runtime data remains outside this Git repository.
+The React/Vite AI Studio, Node API, and GMS dashboard remain separate services so the dashboard's existing OCR, weather summary, FORMAT-II, Excel/PDF processing, and report workflows are preserved.
 
 ## Ports
 
-- AI API: port 8000
+- AI API: port 8000 by default (override with `PORT`)
 - GMS dashboard: port 8001
-- Vite frontend: usually port 5173 in development
+- Vite frontend: port 5173 in development
+
+If another process already uses port 8000, start the AI API with `PORT=8002 npm start`, then point Vite's proxy at it using `VITE_API_TARGET=http://127.0.0.1:8002`. In separate production hosts, set the frontend build variable `VITE_API_BASE_URL` to the reachable API origin and configure server CORS for the frontend origin. Keep backend keys only in server environment variables or secret management.
 
 ## Run in Android Cloud Shell
 
-Run the AI API from the repository root:
+Terminal 1 — backend:
 
 ```bash
 cd server
 npm install
-cp .env.example .env
-# Add provider keys locally to server/.env; never commit this file.
-npm start
+# Keep keys locally in server/.env; never paste them into chats or frontend variables.
+PORT=8000 npm start
 ```
 
-Run the frontend in another terminal:
+Terminal 2 — frontend:
 
 ```bash
 cd frontend
 npm install
-npm run dev -- --host 0.0.0.0
+VITE_API_TARGET=http://127.0.0.1:8000 npm run dev -- --host 0.0.0.0
 ```
 
-Run the dashboard from the trusted uploaded ZIP in a separate runtime directory:
+If port 8000 is occupied by another service, choose an unused port (for example 8002) and set the same port for the frontend's `VITE_API_TARGET`. Do not blindly kill all processes on a port; identify the PID and command first. For production UI/API hosted on different origins, set `VITE_API_BASE_URL` during the build and configure CORS on the backend.
 
-```bash
-mkdir -p ~/gms-suite-runtime
-unzip -o ~/gms-suite.zip -d ~/gms-suite-runtime
-cd ~/gms-suite-runtime/gms-suite
-PORT=8001 ./start.sh
-```
+Run the existing GMS dashboard separately on port 8001 using its own trusted runtime directory and startup instructions. Do not mix its DuckDB databases, uploads, screenshots, or generated exports into this repository.
 
-If the dashboard uses OCR/PDF/legacy MDB features, install only the system dependencies required by those features and verify the project's setup instructions.
+## Verification
 
-## Validation
+- Run `npm test` in `server`.
+- Run `npm run build` in `frontend`.
+- Verify `GET /api/ai/health` exposes only booleans for configured providers.
+- Verify `GET /api/ai/models?refresh=1` refreshes model catalogue data.
+- Test normal and occupied-port startup using non-sensitive test values.
+- Manually test the frontend and dashboard preview URLs with non-sensitive sample data.
 
-- Open the AI Studio frontend and click **Open GMS dashboard**.
-- Verify the dashboard's existing tools, uploads, OCR, exports, and persistence with non-sensitive sample data.
-- Confirm `GET /api/ai/health` exposes only provider configuration status, not credentials.
-- Run `npm run build` in `frontend` and `npm test` in `server`.
-
-## Integration boundary
-
-The launcher connects the user experience only. It does not proxy dashboard APIs or give the AI direct access to DuckDB/workbooks. AI tool buttons create guided prompts and do not execute database mutations. PDF/XLSX parsing and image OCR are not implemented by the AI frontend. A future data-aware integration should add authenticated, validated, read-only APIs and audit logging rather than exposing database files or upload directories to the browser.
+The AI buttons provide guided prompts; they do not directly write to DuckDB or master workbooks. A future data-aware integration should use authenticated, validated APIs and audit logging rather than exposing database files to browsers.
