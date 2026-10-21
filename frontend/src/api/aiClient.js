@@ -15,3 +15,4 @@ async function request(path, options = {}) {
 export const fetchModels = () => request('/api/ai/models');
 export const fetchHealth = () => request('/api/ai/health');
 export const sendPrompt = (body) => request('/api/ai', { method: 'POST', body: JSON.stringify(body) });
+export const sendAgentPrompt = (body) => request('/api/ai/agent', { method: 'POST', body: JSON.stringify(body) });
