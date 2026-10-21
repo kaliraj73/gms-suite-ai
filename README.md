@@ -89,3 +89,7 @@ GitHub Actions runs these checks automatically. A build/test pass does not prove
 - Commit `.env.example`, never real `.env` files.
 - Use HTTPS and a proper secret store when deploying.
 - The in-memory rate limiter is for a single small server instance; use a shared limiter for multi-instance deployment.
+
+## Optional LangChain Deep Agents
+
+An opt-in Python sidecar adds planning and controlled tool orchestration while leaving the standard Gemini/OpenRouter endpoint unchanged. It is **disabled by default**. See [server/deep-agents/README.md](server/deep-agents/README.md) for installation, model configuration, and security boundaries. Set `ENABLE_DEEP_AGENTS=true` only after installing the Python dependencies, configuring `DEEP_AGENTS_SHARED_TOKEN` for both services, and starting the sidecar on loopback. The optional endpoint is `POST /api/ai/agent`; normal chat continues to use `POST /api/ai`.
