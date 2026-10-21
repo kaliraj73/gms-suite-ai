@@ -21,7 +21,7 @@ test('health returns provider status without secrets', async () => {
   await withServer(fakeService(), async (base) => {
     const res = await fetch(`${base}/api/ai/health`);
     assert.equal(res.status, 200);
-    assert.deepEqual(await res.json(), { status: 'ok', providers: { openrouter: true, gemini: false } });
+    assert.deepEqual(await res.json(), { status: 'ok', providers: { openrouter: true, gemini: false }, deepAgents: { enabled: false } });
   });
 });
 test('models endpoint returns model list', async () => {
