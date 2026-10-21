@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import { createApp } from './app.js';
 import { createAiService } from './providers/provider-factory.js';
+import { createDeepAgentsClient } from './services/deep-agents-client.js';
 
 function loadServerEnv() {
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
@@ -23,7 +24,7 @@ function loadServerEnv() {
 loadServerEnv();
 
 const port = Number.parseInt(process.env.PORT || '8000', 10);
-const app = createApp({ aiService: createAiService() });
+const app = createApp({ aiService: createAiService(), deepAgentsService: createDeepAgentsClient() });
 const server = app.listen(port, '0.0.0.0', () => {
   console.log(`GMS Suite AI API listening on port ${port}`);
 });
